@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSV Translator · ES → CA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0d1117;
+        --bg-panel: #131a24;
+        --bg-terminal: #0a0e14;
+        --border: #1f2937;
+        --accent: #00d4ff;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --error: #ef4444;
+        --text: #c9d4e0;
+        --text-dim: #6b7785;
+        --mono: "JetBrains Mono", monospace;
+        --sans: "IBM Plex Sans", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        line-height: 1.5;
+        padding: 32px 20px 80px;
+      }
+
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+      }
+
+      header.app {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 18px;
+        margin-bottom: 28px;
+      }
+
+      header.app h1 {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+
+      header.app h1 .arrow {
+        color: var(--accent);
+      }
+
+      header.app p {
+        color: var(--text-dim);
+        font-size: 13px;
+        font-family: var(--mono);
+        margin-top: 4px;
+      }
+
+      .panel {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 22px;
+        margin-bottom: 22px;
+      }
+
+      .panel.hidden {
+        display: none;
+      }
+
+      .panel h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--accent);
+        font-family: var(--mono);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .panel h2 .num {
+        background: var(--accent);
+        color: var(--bg);
+        font-weight: 700;
+        border-radius: 4px;
+        padding: 1px 7px;
+        font-size: 11px;
+      }
+
+      /* ---- Drop zone ---- */
+      #dropzone {
+        border: 2px dashed var(--accent);
+        border-radius: 10px;
+        padding: 44px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        background: rgba(0, 212, 255, 0.03);
+      }
+
+      #dropzone:hover,
+      #dropzone.drag {
+        background: rgba(0, 212, 255, 0.1);
+        border-color: #4be3ff;
+      }
+
+      #dropzone .big {
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      #dropzone .small {
+        color: var(--text-dim);
+        font-size: 13px;
+        margin-top: 6px;
+        font-family: var(--mono);
+      }
+
+      .inline-error {
+        color: var(--error);
+        font-size: 13px;
+        font-family: var(--mono);
+        margin-top: 12px;
+        min-height: 16px;
+      }
+
+      .file-meta {
+        margin-top: 18px;
+        display: none;
+      }
+
+      .file-meta.show {
+        display: block;
+      }
+
+      .meta-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+
+      .chip {
+        background: var(--bg-terminal);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 12px;
+      }
+
+      .chip b {
+        color: var(--accent);
+      }
+
+      .preview-scroll {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      table.preview {
+        border-collapse: collapse;
+        font-family: var(--mono);
+        font-size: 12px;
+        white-space: nowrap;
+        width: 100%;
+      }
+
+      table.preview th,
+      table.preview td {
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        text-align: left;
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      table.preview th {
+        background: var(--bg-terminal);
+        color: var(--accent);
+        position: sticky;
+        top: 0;
+      }
+
+      table.preview td {
+        color: var(--text-dim);
+      }
+
+      /* ---- Buttons ---- */
+      .btn {
+        font-family: var(--sans);
+        font-weight: 600;
+        font-size: 14px;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 22px;
+        cursor: pointer;
+        transition: transform 0.08s, opacity 0.15s, background 0.15s;
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+      }
+
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #022;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: #4be3ff;
+      }
+
+      .btn-danger {
+        background: transparent;
+        color: var(--error);
+        border: 1px solid var(--error);
+      }
+
+      .btn-danger:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.12);
+      }
+
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-dim);
+        border: 1px solid var(--border);
+      }
+
+      .btn-ghost:hover {
+        color: var(--text);
+        border-color: var(--text-dim);
+      }
+
+      .actions {
+        margin-top: 18px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      /* ---- Progress ---- */
+      .progress-track {
+        background: var(--bg-terminal);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        height: 16px;
+        overflow: hidden;
+        margin-bottom: 16px;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #0090c0, var(--accent));
+        border-radius: 999px;
+        transition: width 0.4s ease;
+      }
+
+      .counters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 22px;
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+
+      .counters .k {
+        color: var(--text-dim);
+      }
+
+      .counters .v {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .counters .v.err {
+        color: var(--error);
+      }
+
+      .counters .v.cost {
+        color: var(--success);
+      }
+
+      /* ---- Log terminal ---- */
+      #logstream,
+      .logstream {
+        background: var(--bg-terminal);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        max-height: 280px;
+        overflow-y: auto;
+        padding: 12px 14px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.65;
+      }
+
+      /* ---- Mode switch ---- */
+      .mode-switch {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 22px;
+      }
+
+      .mode-tab {
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 500;
+        background: var(--bg-panel);
+        color: var(--text-dim);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 9px 18px;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s, background 0.15s;
+      }
+
+      .mode-tab:hover {
+        color: var(--text);
+      }
+
+      .mode-tab.active {
+        color: var(--accent);
+        border-color: var(--accent);
+        background: rgba(0, 212, 255, 0.08);
+      }
+
+      /* ---- Form fields (batch config) ---- */
+      .field {
+        margin-bottom: 14px;
+      }
+
+      .field label {
+        display: block;
+        font-family: var(--mono);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-dim);
+        margin-bottom: 6px;
+      }
+
+      .field input {
+        width: 100%;
+        background: var(--bg-terminal);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+
+      .field input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+
+      .logline {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .logline .ts {
+        color: var(--text-dim);
+      }
+
+      .lvl-INFO {
+        color: var(--accent);
+      }
+      .lvl-SUCCESS {
+        color: var(--success);
+      }
+      .lvl-WARNING {
+        color: var(--warning);
+      }
+      .lvl-ERROR {
+        color: var(--error);
+      }
+
+      /* ---- Final report ---- */
+      .report-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .stat {
+        background: var(--bg-terminal);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 16px;
+      }
+
+      .stat .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-dim);
+        font-family: var(--mono);
+      }
+
+      .stat .value {
+        font-family: var(--mono);
+        font-size: 20px;
+        font-weight: 700;
+        margin-top: 6px;
+      }
+
+      .stat .value.green {
+        color: var(--success);
+      }
+      .stat .value.cyan {
+        color: var(--accent);
+      }
+      .stat .value.red {
+        color: var(--error);
+      }
+      .stat .value.amber {
+        color: var(--warning);
+      }
+
+      .error-list {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        background: var(--bg-terminal);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        max-height: 200px;
+        overflow-y: auto;
+        margin-bottom: 18px;
+      }
+
+      .error-list .row {
+        color: var(--error);
+      }
+
+      .error-list .row.warn {
+        color: var(--warning);
+      }
+
+      .muted {
+        color: var(--text-dim);
+        font-size: 13px;
+        font-family: var(--mono);
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="app">
+        <h1>CSV Translator <span class="arrow">·</span> ES <span class="arrow">→</span> CA</h1>
+        <p>Batch product-catalog translation · OpenAI gpt-5-mini · HTML-safe</p>
+      </header>
+
+      <!-- Mode switch -->
+      <div class="mode-switch">
+        <button class="mode-tab active" id="tab-single">Un archivo</button>
+        <button class="mode-tab" id="tab-batch">Carpeta (lote)</button>
+      </div>
+
+      <div id="mode-single">
+      <!-- SECTION 1: Upload -->
+      <section class="panel" id="panel-upload">
+        <h2><span class="num">1</span> File Upload</h2>
+        <div id="dropzone">
+          <div class="big">Drop a .csv file here</div>
+          <div class="small">or click to browse</div>
+        </div>
+        <input type="file" id="fileInput" accept=".csv" />
+        <div class="inline-error" id="uploadError"></div>
+
+        <div class="file-meta" id="fileMeta">
+          <div class="meta-grid">
+            <div class="chip">File: <b id="metaName">—</b></div>
+            <div class="chip">Rows: <b id="metaRows">0</b></div>
+            <div class="chip">Columns: <b id="metaCols">0</b></div>
+          </div>
+          <div class="preview-scroll">
+            <table class="preview" id="previewTable"></table>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" id="startBtn" disabled>▶ Start Translation</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: Progress -->
+      <section class="panel hidden" id="panel-progress">
+        <h2><span class="num">2</span> Translation Progress</h2>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="counters">
+          <span><span class="k">Rows:</span> <span class="v" id="cRows">0 / 0</span></span>
+          <span><span class="k">Batches:</span> <span class="v" id="cBatches">0 / 0</span></span>
+          <span><span class="k">Errors:</span> <span class="v err" id="cErrors">0</span></span>
+          <span><span class="k">Cache hits:</span> <span class="v" id="cCache">0</span></span>
+          <span><span class="k">Cost:</span> <span class="v cost" id="cCost">$0.0000 (~€0.0000)</span></span>
+          <span><span class="k">Tokens:</span> <span class="v" id="cTokens">0 in / 0 out</span></span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-danger" id="cancelBtn">⏹ Cancel</button>
+        </div>
+      </section>
+
+      <!-- SECTION 3: Log stream -->
+      <section class="panel hidden" id="panel-log">
+        <h2><span class="num">3</span> Live Log</h2>
+        <div id="logstream"></div>
+      </section>
+
+      <!-- SECTION 4: Final report -->
+      <section class="panel hidden" id="panel-report">
+        <h2><span class="num">4</span> Final Report</h2>
+        <div class="report-grid">
+          <div class="stat">
+            <div class="label">Translated OK</div>
+            <div class="value green" id="rSuccess">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Errors</div>
+            <div class="value red" id="rErrors">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">HTML warnings</div>
+            <div class="value amber" id="rWarnings">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Time elapsed</div>
+            <div class="value cyan" id="rTime">0s</div>
+          </div>
+          <div class="stat">
+            <div class="label">Tokens (in / out)</div>
+            <div class="value cyan" id="rTokens">0 / 0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Cache hits</div>
+            <div class="value cyan" id="rCache">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Final cost</div>
+            <div class="value green" id="rCost">$0.0000</div>
+          </div>
+          <div class="stat">
+            <div class="label">In EUR</div>
+            <div class="value green" id="rCostEur">€0.0000</div>
+          </div>
+        </div>
+
+        <div id="reportIssues"></div>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="downloadBtn">⬇ Download Translated CSV</button>
+          <button class="btn btn-ghost" id="resetBtn">↺ Translate Another File</button>
+        </div>
+      </section>
+      </div><!-- /#mode-single -->
+
+      <div id="mode-batch" class="hidden">
+        <!-- BATCH 1: Config -->
+        <section class="panel" id="panel-batch-config">
+          <h2><span class="num">B</span> Carpeta de CSV</h2>
+          <p class="muted" style="margin-bottom:14px">
+            Traduce de golpe todos los <b>.csv</b> de una carpeta. La salida se
+            escribe en <b>traducidos/</b> dentro de esa misma carpeta. Es
+            <b>reanudable</b>: si paras o falla, al volver a lanzarlo se saltan
+            los ya hechos (sin gastar tokens de nuevo).
+          </p>
+          <div class="field">
+            <label for="batchDir">Carpeta de entrada</label>
+            <input
+              type="text"
+              id="batchDir"
+              spellcheck="false"
+              value="/Users/obb/Documents/Productos ES Separados a Traducir/CSV"
+            />
+          </div>
+          <div class="field">
+            <label for="batchCap">Tope de gasto (USD)</label>
+            <input type="number" id="batchCap" min="0.1" step="0.1" value="8" />
+          </div>
+          <div class="inline-error" id="batchError"></div>
+          <div class="actions">
+            <button class="btn btn-primary" id="batchStartBtn">▶ Traducir carpeta</button>
+          </div>
+        </section>
+
+        <!-- BATCH 2: Progress -->
+        <section class="panel hidden" id="panel-batch-progress">
+          <h2><span class="num">B</span> Progreso del lote</h2>
+          <div class="progress-track"><div class="progress-fill" id="batchFill"></div></div>
+          <div class="counters">
+            <span><span class="k">Archivos:</span> <span class="v" id="bcFiles">0 / 0</span></span>
+            <span><span class="k">OK:</span> <span class="v" id="bcOk">0</span></span>
+            <span><span class="k">Errores:</span> <span class="v err" id="bcFail">0</span></span>
+            <span><span class="k">Omitidos:</span> <span class="v" id="bcSkip">0</span></span>
+            <span><span class="k">Actual:</span> <span class="v" id="bcCurrent">—</span></span>
+            <span><span class="k">Coste:</span> <span class="v cost" id="bcCost">$0.0000 (~€0.0000)</span></span>
+            <span><span class="k">Tokens:</span> <span class="v" id="bcTokens">0 in / 0 out</span></span>
+          </div>
+          <div class="actions">
+            <button class="btn btn-danger" id="batchCancelBtn">⏹ Cancelar</button>
+          </div>
+        </section>
+
+        <!-- BATCH 3: Log -->
+        <section class="panel hidden" id="panel-batch-log">
+          <h2><span class="num">B</span> Registro</h2>
+          <div id="batchLog" class="logstream"></div>
+        </section>
+
+        <!-- BATCH 4: Report -->
+        <section class="panel hidden" id="panel-batch-report">
+          <h2><span class="num">B</span> Resumen del lote</h2>
+          <div class="report-grid">
+            <div class="stat"><div class="label">Archivos OK</div><div class="value green" id="brOk">0</div></div>
+            <div class="stat"><div class="label">Con error</div><div class="value red" id="brFail">0</div></div>
+            <div class="stat"><div class="label">Omitidos</div><div class="value cyan" id="brSkip">0</div></div>
+            <div class="stat"><div class="label">Con avisos HTML</div><div class="value amber" id="brWarn">0</div></div>
+            <div class="stat"><div class="label">Tokens (in / out)</div><div class="value cyan" id="brTokens">0 / 0</div></div>
+            <div class="stat"><div class="label">Coste total</div><div class="value green" id="brCost">$0.0000</div></div>
+            <div class="stat"><div class="label">En EUR</div><div class="value green" id="brCostEur">€0.0000</div></div>
+            <div class="stat"><div class="label">Estado</div><div class="value cyan" id="brStatus">—</div></div>
+          </div>
+          <div id="batchReportIssues"></div>
+          <div class="muted" id="batchOutDir" style="margin-bottom:14px"></div>
+          <div class="actions">
+            <button class="btn btn-ghost" id="batchResetBtn">↺ Nuevo lote</button>
+          </div>
+        </section>
+      </div><!-- /#mode-batch -->
+    </div>
+
+    <script>
+      // ----- State -----
+      let fileId = null;
+      let jobId = null;
+      let evtSource = null;
+
+      // ----- Elements -----
+      const $ = (id) => document.getElementById(id);
+      const dropzone = $("dropzone");
+      const fileInput = $("fileInput");
+      const uploadError = $("uploadError");
+      const fileMeta = $("fileMeta");
+      const startBtn = $("startBtn");
+      const cancelBtn = $("cancelBtn");
+      const downloadBtn = $("downloadBtn");
+      const resetBtn = $("resetBtn");
+      const logstream = $("logstream");
+
+      const panelProgress = $("panel-progress");
+      const panelLog = $("panel-log");
+      const panelReport = $("panel-report");
+
+      // ----- Upload via drag/drop + click -----
+      dropzone.addEventListener("click", () => fileInput.click());
+      dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("drag");
+      });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("drag");
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+      });
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files.length) handleFile(fileInput.files[0]);
+      });
+
+      function handleFile(file) {
+        uploadError.textContent = "";
+        if (!/\.csv$/i.test(file.name)) {
+          uploadError.textContent = "✖ Only .csv files are accepted.";
+          return;
+        }
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        uploadError.textContent = "Uploading…";
+        fetch("/api/upload", { method: "POST", body: fd })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.error) {
+              uploadError.textContent = "✖ " + data.error;
+              return;
+            }
+            uploadError.textContent = "";
+            fileId = data.fileId;
+            showFileMeta(data);
+          })
+          .catch((err) => {
+            uploadError.textContent = "✖ Upload failed: " + err.message;
+          });
+      }
+
+      function showFileMeta(data) {
+        $("metaName").textContent = fileInput.files[0]
+          ? fileInput.files[0].name
+          : "uploaded.csv";
+        $("metaRows").textContent = data.totalRows;
+        $("metaCols").textContent = data.columns.length;
+
+        const table = $("previewTable");
+        table.innerHTML = "";
+        const thead = document.createElement("thead");
+        const htr = document.createElement("tr");
+        data.columns.forEach((c) => {
+          const th = document.createElement("th");
+          th.textContent = c;
+          htr.appendChild(th);
+        });
+        thead.appendChild(htr);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        data.preview.forEach((row) => {
+          const tr = document.createElement("tr");
+          data.columns.forEach((c) => {
+            const td = document.createElement("td");
+            td.textContent = row[c] != null ? row[c] : "";
+            td.title = td.textContent;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        fileMeta.classList.add("show");
+        startBtn.disabled = false;
+      }
+
+      // ----- Start translation -----
+      startBtn.addEventListener("click", () => {
+        if (!fileId) return;
+        startBtn.disabled = true;
+        panelProgress.classList.remove("hidden");
+        panelLog.classList.remove("hidden");
+        panelReport.classList.add("hidden");
+        logstream.innerHTML = "";
+
+        fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileId }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.error) {
+              addLog("ERROR", data.error, new Date().toISOString());
+              startBtn.disabled = false;
+              return;
+            }
+            jobId = data.jobId;
+            connectEvents(jobId);
+          });
+      });
+
+      // ----- SSE -----
+      function connectEvents(id) {
+        if (evtSource) evtSource.close();
+        evtSource = new EventSource("/api/events/" + id);
+        evtSource.onmessage = (e) => {
+          const ev = JSON.parse(e.data);
+          handleEvent(ev);
+        };
+        evtSource.onerror = () => {
+          /* will auto-retry; closed on complete */
+        };
+      }
+
+      function handleEvent(ev) {
+        if (ev.type === "log") {
+          addLog(ev.level, ev.message, ev.time);
+        } else if (ev.type === "progress") {
+          updateProgress(ev);
+        } else if (ev.type === "complete") {
+          updateProgress(ev);
+          showReport(ev);
+          if (evtSource) evtSource.close();
+        } else if (ev.type === "error") {
+          addLog("ERROR", ev.message, new Date().toISOString());
+          if (evtSource) evtSource.close();
+        }
+      }
+
+      function fmtMoney(usd, eur) {
+        return "$" + usd.toFixed(4) + " (~€" + eur.toFixed(4) + ")";
+      }
+
+      function updateProgress(ev) {
+        const pct =
+          ev.totalRows > 0 ? (ev.processedRows / ev.totalRows) * 100 : 0;
+        $("progressFill").style.width = pct.toFixed(1) + "%";
+        $("cRows").textContent = ev.processedRows + " / " + ev.totalRows;
+        $("cBatches").textContent =
+          ev.processedBatches + " / " + ev.totalBatches;
+        $("cErrors").textContent = ev.errorRows;
+        $("cCache").textContent = ev.cacheHits;
+        $("cCost").textContent = fmtMoney(ev.costUsd, ev.costEur);
+        $("cTokens").textContent =
+          ev.promptTokens + " in / " + ev.completionTokens + " out";
+      }
+
+      function addLog(level, message, isoTime) {
+        const line = document.createElement("div");
+        line.className = "logline";
+        const t = isoTime ? new Date(isoTime) : new Date();
+        const hh = String(t.getHours()).padStart(2, "0");
+        const mm = String(t.getMinutes()).padStart(2, "0");
+        const ss = String(t.getSeconds()).padStart(2, "0");
+        const ts = `[${hh}:${mm}:${ss}]`;
+        line.innerHTML =
+          `<span class="ts">${ts}</span> ` +
+          `<span class="lvl-${level}">[${level}]</span> ` +
+          escapeHtml(message);
+        logstream.appendChild(line);
+        logstream.scrollTop = logstream.scrollHeight;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      // ----- Final report -----
+      function showReport(ev) {
+        panelReport.classList.remove("hidden");
+        $("rSuccess").textContent = ev.successRows;
+        $("rErrors").textContent = ev.errorRows;
+        $("rWarnings").textContent = ev.warningCount;
+        $("rTime").textContent = (ev.elapsedMs / 1000).toFixed(1) + "s";
+        $("rTokens").textContent =
+          ev.promptTokens + " / " + ev.completionTokens;
+        $("rCache").textContent = ev.cacheHits;
+        $("rCost").textContent = "$" + ev.costUsd.toFixed(4);
+        $("rCostEur").textContent = "€" + ev.costEur.toFixed(4);
+
+        const issues = $("reportIssues");
+        issues.innerHTML = "";
+        if (ev.errors && ev.errors.length) {
+          const box = document.createElement("div");
+          box.className = "error-list";
+          box.innerHTML =
+            '<div class="muted">Rows with errors:</div>' +
+            ev.errors
+              .map(
+                (e) =>
+                  `<div class="row">• id ${escapeHtml(e.id)} — ${escapeHtml(
+                    e.reason
+                  )}</div>`
+              )
+              .join("");
+          issues.appendChild(box);
+        }
+        if (ev.warnings && ev.warnings.length) {
+          const box = document.createElement("div");
+          box.className = "error-list";
+          box.innerHTML =
+            '<div class="muted">Avisos para revisión:</div>' +
+            ev.warnings
+              .map((w) => {
+                const detail =
+                  w.note ||
+                  `field "${w.field}" — src [${(w.srcTags || []).join(
+                    " "
+                  )}] vs out [${(w.dstTags || []).join(" ")}]`;
+                return `<div class="row warn">• ${escapeHtml(detail)}</div>`;
+              })
+              .join("");
+          issues.appendChild(box);
+        }
+        // Disable cancel once done
+        cancelBtn.disabled = true;
+      }
+
+      // ----- Cancel -----
+      cancelBtn.addEventListener("click", () => {
+        if (!jobId) return;
+        cancelBtn.disabled = true;
+        addLog("WARNING", "Cancellation requested…", new Date().toISOString());
+        fetch("/api/cancel/" + jobId, { method: "POST" });
+      });
+
+      // ----- Download -----
+      downloadBtn.addEventListener("click", () => {
+        if (!jobId) return;
+        window.location = "/api/download/" + jobId;
+      });
+
+      // ----- Reset -----
+      resetBtn.addEventListener("click", () => {
+        if (evtSource) evtSource.close();
+        fileId = null;
+        jobId = null;
+        fileInput.value = "";
+        fileMeta.classList.remove("show");
+        startBtn.disabled = true;
+        cancelBtn.disabled = false;
+        uploadError.textContent = "";
+        logstream.innerHTML = "";
+        panelProgress.classList.add("hidden");
+        panelLog.classList.add("hidden");
+        panelReport.classList.add("hidden");
+        $("progressFill").style.width = "0%";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+
+      // =====================================================================
+      // BATCH (folder) MODE
+      // =====================================================================
+      let batchId = null;
+      let batchEvt = null;
+
+      // ----- Mode switch -----
+      $("tab-single").addEventListener("click", () => switchMode("single"));
+      $("tab-batch").addEventListener("click", () => switchMode("batch"));
+
+      function switchMode(mode) {
+        const single = mode === "single";
+        $("tab-single").classList.toggle("active", single);
+        $("tab-batch").classList.toggle("active", !single);
+        $("mode-single").classList.toggle("hidden", !single);
+        $("mode-batch").classList.toggle("hidden", single);
+      }
+
+      // ----- Log writer for the batch terminal -----
+      function addBatchLog(level, message, isoTime, file) {
+        const box = $("batchLog");
+        const line = document.createElement("div");
+        line.className = "logline";
+        const t = isoTime ? new Date(isoTime) : new Date();
+        const hh = String(t.getHours()).padStart(2, "0");
+        const mm = String(t.getMinutes()).padStart(2, "0");
+        const ss = String(t.getSeconds()).padStart(2, "0");
+        const ts = `[${hh}:${mm}:${ss}]`;
+        const prefix = file ? `(${escapeHtml(file)}) ` : "";
+        line.innerHTML =
+          `<span class="ts">${ts}</span> ` +
+          `<span class="lvl-${level}">[${level}]</span> ` +
+          prefix +
+          escapeHtml(message);
+        box.appendChild(line);
+        box.scrollTop = box.scrollHeight;
+      }
+
+      // ----- Start batch -----
+      $("batchStartBtn").addEventListener("click", () => {
+        const inputDir = $("batchDir").value.trim();
+        const maxCostUsd = parseFloat($("batchCap").value);
+        $("batchError").textContent = "";
+        if (!inputDir) {
+          $("batchError").textContent = "✖ Indica la carpeta de entrada.";
+          return;
+        }
+        $("batchStartBtn").disabled = true;
+        $("panel-batch-progress").classList.remove("hidden");
+        $("panel-batch-log").classList.remove("hidden");
+        $("panel-batch-report").classList.add("hidden");
+        $("batchLog").innerHTML = "";
+        $("batchCancelBtn").disabled = false;
+
+        fetch("/api/batch/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inputDir, maxCostUsd }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.error) {
+              $("batchError").textContent = "✖ " + data.error;
+              $("batchStartBtn").disabled = false;
+              return;
+            }
+            batchId = data.batchId;
+            addBatchLog(
+              "INFO",
+              `${data.total} archivos · ${data.pending} pendientes · ${data.skipped} ya hechos`,
+              new Date().toISOString()
+            );
+            connectBatchEvents(batchId);
+          })
+          .catch((err) => {
+            $("batchError").textContent = "✖ " + err.message;
+            $("batchStartBtn").disabled = false;
+          });
+      });
+
+      function connectBatchEvents(id) {
+        if (batchEvt) batchEvt.close();
+        batchEvt = new EventSource("/api/batch/events/" + id);
+        batchEvt.onmessage = (e) => handleBatchEvent(JSON.parse(e.data));
+        batchEvt.onerror = () => {};
+      }
+
+      function handleBatchEvent(ev) {
+        if (ev.type === "log") {
+          addBatchLog(ev.level, ev.message, ev.time, ev.file);
+        } else if (ev.type === "batch-start") {
+          $("bcFiles").textContent = "0 / " + ev.totalFiles;
+        } else if (ev.type === "file-start") {
+          $("bcCurrent").textContent = ev.file;
+        } else if (ev.type === "progress") {
+          updateBatchProgress(ev);
+        } else if (ev.type === "file-done") {
+          updateBatchProgress(ev);
+        } else if (ev.type === "batch-complete") {
+          updateBatchProgress(ev);
+          showBatchReport(ev);
+          if (batchEvt) batchEvt.close();
+        } else if (ev.type === "error") {
+          addBatchLog("ERROR", ev.message, new Date().toISOString());
+          if (ev.fatal && batchEvt) batchEvt.close();
+        }
+      }
+
+      function updateBatchProgress(ev) {
+        if (ev.totalFiles != null && ev.processedFiles != null) {
+          const pct =
+            ev.totalFiles > 0 ? (ev.processedFiles / ev.totalFiles) * 100 : 0;
+          $("batchFill").style.width = pct.toFixed(1) + "%";
+          $("bcFiles").textContent = ev.processedFiles + " / " + ev.totalFiles;
+        }
+        if (ev.okCount != null) $("bcOk").textContent = ev.okCount;
+        if (ev.failCount != null) $("bcFail").textContent = ev.failCount;
+        if (ev.skipCount != null) $("bcSkip").textContent = ev.skipCount;
+        if (ev.file) $("bcCurrent").textContent = ev.file;
+        if (ev.costUsd != null) {
+          $("bcCost").textContent =
+            "$" + ev.costUsd.toFixed(4) + " (~€" + ev.costEur.toFixed(4) + ")";
+        }
+        if (ev.cumIn != null) {
+          $("bcTokens").textContent = ev.cumIn + " in / " + ev.cumOut + " out";
+        }
+      }
+
+      function showBatchReport(ev) {
+        $("panel-batch-report").classList.remove("hidden");
+        $("brOk").textContent = ev.okCount;
+        $("brFail").textContent = ev.failCount;
+        $("brSkip").textContent = ev.skipCount;
+        $("brWarn").textContent = ev.warnFiles;
+        $("brTokens").textContent = ev.cumIn + " / " + ev.cumOut;
+        $("brCost").textContent = "$" + ev.costUsd.toFixed(4);
+        $("brCostEur").textContent = "€" + ev.costEur.toFixed(4);
+        $("brStatus").textContent = ev.status;
+        $("batchOutDir").textContent = "Salida: " + ev.outputDir;
+        $("batchCancelBtn").disabled = true;
+
+        const issues = $("batchReportIssues");
+        issues.innerHTML = "";
+        if (ev.failed && ev.failed.length) {
+          const box = document.createElement("div");
+          box.className = "error-list";
+          box.innerHTML =
+            '<div class="muted">Archivos con error:</div>' +
+            ev.failed
+              .map(
+                (f) =>
+                  `<div class="row">• ${escapeHtml(f.file)} — ${escapeHtml(
+                    f.error
+                  )}</div>`
+              )
+              .join("");
+          issues.appendChild(box);
+        }
+      }
+
+      // ----- Batch cancel -----
+      $("batchCancelBtn").addEventListener("click", () => {
+        if (!batchId) return;
+        $("batchCancelBtn").disabled = true;
+        addBatchLog(
+          "WARNING",
+          "Cancelación solicitada…",
+          new Date().toISOString()
+        );
+        fetch("/api/batch/cancel/" + batchId, { method: "POST" });
+      });
+
+      // ----- Batch reset -----
+      $("batchResetBtn").addEventListener("click", () => {
+        if (batchEvt) batchEvt.close();
+        batchId = null;
+        $("batchStartBtn").disabled = false;
+        $("batchCancelBtn").disabled = false;
+        $("batchError").textContent = "";
+        $("batchLog").innerHTML = "";
+        $("panel-batch-progress").classList.add("hidden");
+        $("panel-batch-log").classList.add("hidden");
+        $("panel-batch-report").classList.add("hidden");
+        $("batchFill").style.width = "0%";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    </script>
+  </body>
+</html>
