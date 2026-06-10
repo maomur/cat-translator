@@ -1,3 +1,9 @@
 node_modules/
 .env
 *.log
+
+# Catalog data — the user's product CSVs live in the project dir but must NOT be
+# published (commercial data, large). The app code is what belongs in git.
+productos_*.csv
+*_CA.csv
+*_unificado*.csv

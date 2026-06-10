@@ -39,7 +39,7 @@ const MODEL = "gpt-5-mini";
 // cheap. Override with REASONING_EFFORT=low|medium|high in .env if needed.
 const REASONING_EFFORT = process.env.REASONING_EFFORT || "minimal";
 const BATCH_SIZE = 10;
-const MAX_CONCURRENCY = 3;
+const MAX_CONCURRENCY = 6;
 const MAX_RETRIES = 3;
 const TRANSLATE_COLUMNS = ["name", "description", "x_short_description"];
 
@@ -56,8 +56,24 @@ const LENGTH_CHECK_MIN_RATIO = 0.6;
 // whose translation is byte-identical to the source AND still contains clear
 // Spanish markers (words/patterns that differ in Catalan) is almost certainly
 // untranslated. Used only on echoed fields, so false positives just cost a flag.
-const SPANISH_MARKERS =
-  /\b(con|para|los|las|una|unos|unas|como|más|muy|este|esta|estos|estas|del|pero|también|según|niñ\w*|juego|juegos|años|incluye|hecho|fácil|blanco|negro|rojo|amarillo|ligero|saco|madera|agua|cocina|silla|cama|para el|con el|de la|en el|es un|es una|tu|sus|muñec\w*|pequeñ\w*|grande|nuevo|nueva)\b|ñ|ci[óo]n\b|dad\b/i;
+// NOTE: matched with Unicode-aware boundaries (lookarounds on \p{L} + the "u"
+// flag), NOT JS "\b". JS "\b" is ASCII-only and silently fails on accented
+// words (é/ó/ñ) — a real bug that undercounted markers like "bébé"/"años".
+// Accented variants are spelled out instead of relying on "\w*".
+const SPANISH_MARKER_WORDS = [
+  "con", "para", "los", "las", "una", "unos", "unas", "como", "más", "muy",
+  "este", "esta", "estos", "estas", "del", "pero", "también", "según",
+  "niño", "niños", "niña", "niñas", "juego", "juegos", "juguete", "juguetes",
+  "años", "incluye", "hecho", "fácil", "blanco", "negro", "rojo", "amarillo",
+  "ligero", "saco", "madera", "agua", "cocina", "silla", "cama", "es un",
+  "es una", "tu", "sus", "muñeca", "muñeco", "muñecas", "pequeño", "pequeña",
+  "pequeños", "grande", "nuevo", "nueva", "bebé", "bébé", "cuna", "capazo",
+  "carrito", "cochecito", "guirnalda", "pulseras", "neceser", "bolso",
+].join("|");
+const SPANISH_MARKERS = new RegExp(
+  "(?<![\\p{L}])(?:" + SPANISH_MARKER_WORDS + ")(?![\\p{L}])|ñ|ci[óo]n(?![\\p{L}])",
+  "iu"
+);
 const UNTRANSLATED_MIN_CHARS = 8;
 
 function looksUntranslated(src, out) {
@@ -73,11 +89,17 @@ const USD_TO_EUR = 0.92;
 
 const SYSTEM_PROMPT = `You are a professional Spanish-to-Catalan translator for e-commerce product catalogs.
 Rules:
-1. Translate only visible text. Never modify, remove, or reorder HTML tags.
-2. Preserve all HTML tags exactly as they appear in the source.
-3. Return ONLY a JSON object with key "rows" containing the translated array.
-4. Keep the same array index "i" for each row.
-5. If a field is empty string or null, return it unchanged.`;
+1. ALWAYS translate into natural, standard Catalan. NEVER leave text in Spanish and NEVER use French, English or any other language. If a source value is already in another language, still output natural Catalan.
+2. Translate EVERY field, including short product names. Use the correct everyday Catalan term and follow this glossary EXACTLY (do not pick other synonyms):
+   - "Carrito" / "Carrito de bebé" / "Cochecito" → "Cotxet de nadó" (or "Cotxet"). NEVER "Carret" nor "Cotxe".
+   - "Capazo" / "Cuco" / "Nacelle" → "Bressol".
+   - "Cuna" → "Bressol".
+   - "Silla" / "Silla de paseo" → "Cadira" / "Cadira de passeig".
+   - "Bebé" → "Nadó" (never the French "bébé"). "Juguete" → "Joguina" (never "jouet").
+3. Keep brand names, model names, product codes, sizes and colours-as-proper-nouns unchanged (e.g. "Cybex", "ROBOTICA 4M", "Djeco").
+4. Translate only visible text. Never modify, remove, or reorder HTML tags; preserve all HTML tags exactly as they appear in the source.
+5. Return ONLY a JSON object with key "rows" containing the translated array, keeping the same array index "i" for each row.
+6. If a field is empty string or null, return it unchanged.`;
 
 // ---------------------------------------------------------------------------
 // OpenAI client

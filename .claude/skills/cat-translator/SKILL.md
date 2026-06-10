@@ -110,20 +110,45 @@ console.log({rowMis,colAlt,err,untranslated:untr,html,truncated:short});
   if persistent, lower `MAX_CONCURRENCY` in `server.js`.
 - **Missing translations / "missing row in API response"** — the model returned
   malformed JSON or dropped a row index; usually transient, re-run the file.
-- **Fields left in Spanish / truncated descriptions** — symptoms of
-  `REASONING_EFFORT=minimal`. The `untranslated`/`length` warnings flag them.
-  Fix by re-translating only the flagged rows (one field per call, higher
-  reasoning, validate that tags match and the text actually changed), or re-run
-  the whole batch with `REASONING_EFFORT=low`. Re-translating per field avoids
-  the batch pressure that causes the model to echo/abbreviate.
+- **Fields left in Spanish / French / wrong term / truncated** — all symptoms of
+  `REASONING_EFFORT=minimal` (it truncates, echoes Spanish, drifts to French,
+  and picks wrong Catalan synonyms for short names). `low` costs about the same
+  and fixes nearly all of it (but is ~6× slower). The hardened `SYSTEM_PROMPT`
+  glossary (Carrito → **Cotxet de nadó**, Capazo/Cuna → **Bressol**) handles the
+  term consistency. To repair an already-finished run, see "Remediation" below.
 - **Garbled accents in Excel** — output is UTF-8 with BOM already; ensure Excel
   imports as UTF-8.
 - **Progress seems stuck** — open the **Live Log** (Section 3); each batch logs
   sent/received, tokens, running cost, retries, and HTML warnings.
+
+## Remediation (repair a finished run without re-translating everything)
+
+Proven on a real run that left ~1000+ flawed fields. Write ad-hoc Node scripts
+(not app code) and reuse this exact pattern; full version in `CLAUDE.md`:
+
+1. **Join outputs to the Spanish source by `id`** (stable catalog key; matched
+   100%). This lets you recover the true Spanish for any field and translate
+   from source, not from the bad Catalan.
+2. **Detect flawed fields**: HTML-tag mismatch, length < 60% (truncation),
+   `srv.looksUntranslated` (echoed Spanish), French markers
+   (`bébé|jouet|avec|pour|jeu|enfant`), wrong term (`carret|cotxe` in output
+   while source is `carrito|cochecito|capazo|cuna`).
+3. **Re-translate only those, ONE field per call**, `REASONING_EFFORT=low|high`,
+   via `srv.translateBatch([{i:0,[field]:src}], job)`. Validate (tags match, not
+   too short, changed / not still Spanish), up to 3 tries. Per-field calls avoid
+   the batch pressure that causes echoing.
+4. **Patch into a NEW file** (never overwrite the user's input); drop the
+   `_translation_error` column if clean.
+5. **Residual word polish = local string replacement, no API.** Whole-word,
+   case-preserving swaps (blanco→blanc, "Nueva Generación"→"Nova Generació",
+   colecho→co-dormir, bébé→nadó…). **Gotchas:** "blanca"/"negra" are valid
+   Catalan (skip); `\bpara\b` matches inside "para-sol" (protect it); **JS `\b`
+   misses accents** → use `\p{L}` lookarounds with the `u` flag.
 
 ## Editing the engine
 
 When changing `server.js`, run the ad-hoc tests described in `CLAUDE.md`
 (require the module, mock `srv.openai.chat.completions.create`, exercise
 `runJob` / the HTTP server) before telling the user it works. Preserve the
-**dedup-first** design and the no-`temperature` constraint.
+**dedup-first** design, the no-`temperature` constraint, and the Unicode-aware
+(`\p{L}`, not `\b`) `SPANISH_MARKERS`.

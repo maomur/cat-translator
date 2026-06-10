@@ -42,19 +42,33 @@ There is no `npm test`. Tests are ad-hoc Node scripts (see "Testing" below).
   deduplicates before batching. Don't regress this.
 - **Batching.** Unique strings are packed into the documented JSON row schema,
   `BATCH_SIZE (10) × 3 field-slots = 30 strings per API call`, up to
-  `MAX_CONCURRENCY (3)` concurrent calls via `runPool`. The field slot
-  (name/description/...) is just a label — the system prompt treats all fields
-  identically, so packing is field-agnostic.
+  `MAX_CONCURRENCY` concurrent calls via `runPool`. `MAX_CONCURRENCY` is **6**
+  (raised from 3 to halve wall-clock time on the slow `low` setting; the retry
+  backoff absorbs the occasional 429). The field slot (name/description/...) is
+  just a label — the system prompt treats all fields identically, so packing is
+  field-agnostic.
 - **`gpt-5-mini` constraint.** This model only supports the **default
   temperature (1)**. Do NOT add `temperature` to the
   `openai.chat.completions.create` call — it returns a 400. (Same for other
   sampling params that the model may reject.)
 - **Reasoning effort.** `gpt-5-mini` is a reasoning model. `REASONING_EFFORT`
-  (default `"minimal"`, override via `.env`) is passed to every call. `minimal`
-  is ~3× cheaper/faster but **occasionally degrades quality** — it can truncate
-  long descriptions or echo the Spanish source back untranslated. For
-  quality-critical runs prefer `low`/`medium`. The three quality checks below
-  exist precisely because `minimal` is lossy.
+  (code default `"minimal"`, but **`.env` sets `low`** — that's the effective
+  default now) is passed to every call. Measured on a real 80-row file:
+  `minimal` ≈ $0.054, `low` ≈ $0.058, `medium` ≈ $0.15 — so **`low` costs
+  almost the same as `minimal` but is far more reliable** (it was the only
+  setting with zero quality warnings on the test). The catch: `low` is ~6×
+  **slower** per call (≈11 min/80-row file vs ≈1.7 min), which is why
+  `MAX_CONCURRENCY` was raised to 6. `minimal`'s failure modes, all seen in a
+  real ~96-file run: truncates long descriptions, echoes the Spanish source
+  untranslated (~4% of fields), **drifts to French** ("bébé", "jouet", "avec"),
+  and picks **wrong Catalan synonyms** for short names ("Carrito" →
+  "Carret"/"Cotxe" instead of "Cotxet"). Prefer `low` for anything real.
+- **Hardened prompt + glossary.** `SYSTEM_PROMPT` now explicitly forbids leaving
+  Spanish or using French/English, tells the model to translate EVERY field
+  (incl. short names), and pins a glossary (Carrito/Cochecito → **Cotxet de
+  nadó**, Capazo/Cuna → **Bressol**, Bebé → Nadó, Juguete → Joguina). This
+  directly fixed the language-drift and wrong-synonym problems. (It's longer
+  than the old "keep it short for caching" prompt — quality won that trade-off.)
 - **Three quality checks** (in `runJob`'s field loop — all flag `job.warnings`
   as `kind: "html" | "length" | "untranslated"`, never reject; the translation
   is still used):
@@ -67,7 +81,10 @@ There is no `npm test`. Tests are ad-hoc Node scripts (see "Testing" below).
      to the source AND the source matches `SPANISH_MARKERS` ⇒ the model echoed
      Spanish. This is the only check that catches non-translation, because
      identical text passes the HTML and length checks. Added after a real run
-     left ~900 fields (4%) untranslated under `minimal`.
+     left ~900 fields (4%) untranslated under `minimal`. `SPANISH_MARKERS` uses
+     **Unicode-aware boundaries** (lookarounds on `\p{L}` + the `u` flag), NOT
+     JS `\b` — `\b` is ASCII-only and silently fails on accented words
+     (`bébé`, `años`, `-ción`), which once undercounted markers badly.
 - **Retries.** `translateBatch` retries up to `MAX_RETRIES (3)` with exponential
   backoff (1s/2s/4s). After that the batch's strings are marked errored; rows
   using them keep the **original Spanish** and gain a `_translation_error`
@@ -126,6 +143,34 @@ point of this mode):
 
 The per-file `job` forwards its events to the batch SSE stream via the
 `job.onEvent` hook added in `emit()`.
+
+## Fixing a finished run (remediation playbook)
+
+A real `minimal` run shipped ~1000+ flawed fields. These are **ad-hoc Node
+scripts** (not part of the app) that fixed them cheaply without re-translating
+everything. Reuse this pattern — it's the proven recovery path:
+
+1. **Audit the outputs vs the Spanish source.** Join output rows to the source
+   by **`id`** (the catalog's stable key — a 7646-row unified output matched the
+   96 source files 100% by `id`). Per translatable field, flag: HTML-tag
+   mismatch, length < 60% (truncation), `looksUntranslated` (echoed Spanish),
+   French markers (`bébé|jouet|avec|pour|jeu|enfant`), or wrong stroller term
+   (`carret|cotxe` in output while source is `carrito|cochecito|capazo|cuna`).
+2. **Re-translate only the flagged fields, ONE field per call**, with
+   `REASONING_EFFORT=high|low` and the glossary prompt. Per-field calls remove
+   the batch pressure that makes the model echo/abbreviate. Validate each result
+   (tags match, not too short, actually changed / not still Spanish) with up to
+   3 attempts; recover the true Spanish via the `id` join so you translate from
+   source, not from the bad Catalan.
+3. **Patch in place**, drop the `_translation_error` column if no errors remain,
+   write to a NEW file (never overwrite the user's input).
+4. **Residual word-level polish is local string replacement, no API.** Safe,
+   whole-word, case-preserving swaps for leftover colours/terms (blanco→blanc,
+   negro→negre, "Nueva Generación"→"Nova Generació", colecho→co-dormir, French
+   bébé→nadó…). Pitfalls learned: "blanca"/"negra" are **valid Catalan** (don't
+   swap); `\bpara\b` matches inside "para-sol" (protect it); and JS `\b` misses
+   accents — use `\p{L}` lookarounds with the `u` flag (the same bug that lives
+   in `SPANISH_MARKERS`).
 
 ## Testing
 
